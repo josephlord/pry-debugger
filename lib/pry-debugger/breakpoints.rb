@@ -10,11 +10,14 @@ module PryDebugger
 
     # Add a new breakpoint.
     def add(file, line, expression = nil)
-      raise ArgumentError, 'Invalid file!' unless File.exist?(file)
+      real_file = (file != Pry.eval_path)
+      raise ArgumentError, 'Invalid file!' if real_file && !File.exist?(file)
       validate_expression expression
 
       Pry.processor.debugging = true
-      Debugger.add_breakpoint(File.expand_path(file), line, expression)
+
+      path = (real_file ? File.expand_path(file) : file)
+      Debugger.add_breakpoint(path, line, expression)
     end
 
     # Change the conditional expression for a breakpoint.
@@ -85,8 +88,10 @@ module PryDebugger
     end
 
     def validate_expression(expression)
-      # `complete_expression?` throws a SyntaxError on invalid input.
-      expression && Pry::Code.complete_expression?(expression)
+      if expression &&   # `nil` implies no expression given, so pass
+          (expression.empty? || !Pry::Code.complete_expression?(expression))
+        raise "Invalid breakpoint conditional: #{expression}"
+      end
     end
   end
 end
